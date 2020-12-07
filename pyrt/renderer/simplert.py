@@ -10,7 +10,8 @@ from ..scene import Scene
 from ..math import *
 
 import time
-
+import random
+import numpy as np
 
 class SimpleRT(Renderer):
     def __init__(self, shadow=False, iterations=1):
@@ -28,10 +29,38 @@ class SimpleRT(Renderer):
         for element in scene.nodes:
             if element.hit(ray, hitrecord):
                 hit = True
-                hitrecord.obj = element  # set hit object
+                hitrecord.obj = element  # set hit object)
+
+                # Focal length determines how far objects must be from the camera to be in focus;
+                focal_length = 25
+
+                # Aperture size will determine how blurry objects that are out of focus will appear.
+                aperture_size = 0.1
+
+                # Calculating P
+                p = ray.direction * focal_length
+
+                # Shifting the ray.origin
+                # Random number in the range of -0.5 to 0.5 for each component of a vector
+                vec_3 = Vec3(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+
+                # Multiply that vector by aperture size
+                vec_3 *= aperture_size
+
+                # Add that result on to ray.origin
+                ray.start += vec_3
+
+                # Recalculate ray.direction which begins at this new ray.origin and goes toward the focal point P 
+                #ray.direction = Vec3(p.x - ray.start.x, p.y - ray.start.y, p.z - ray.start.z)
+                distance = scene.camera.position - hitrecord.point
+                d = np.linalg.norm(np.array([distance.x, distance.y, distance.z]))
 
                 # element hit -> call shader:
                 color = element.material.shade(scene.camera, ray, hitrecord, scene.lights)
+                color[0] *= (1 - d/focal_length)
+                color[1] *= (1 - d/focal_length)
+                color[2] *= (1 - d/focal_length)
+
                 r = int(color[0] * 255)
                 g = int(color[1] * 255)
                 b = int(color[2] * 255)
@@ -41,9 +70,10 @@ class SimpleRT(Renderer):
                     # is hitpoint in shadow ?
                     f, n = self._shadow(scene, hitrecord)
                     self.num_shadow_rays += n
-                    r = int(r * f)
-                    g = int(g * f)
-                    b = int(b * f)
+                    
+                    r = int(r * f) * (1 - d/focal_length)
+                    g = int(g * f) * (1 - d/focal_length)
+                    b = int(b * f) * (1 - d/focal_length)
 
 
         return hit, r, g, b
